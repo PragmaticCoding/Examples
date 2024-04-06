@@ -1,0 +1,29 @@
+.hex-label {
+  -fx-border-width: 0px;
+  -fx-text-fill: blue;
+}
+
+.hex-title {
+  -fx-font-size: 14px;
+  -fx-font-weight: bold;
+  -fx-text-fill: blue;
+}
+
+.hex-label: editing {
+   -fx-border-width: 1px;
+   -fx-border-color: blue;
+   -fx-border-insets: -2 0 -2 0;
+   -fx-background-color: lightblue;
+   -fx-background-insets: -2 0 -2 0;
+}
+
+.hex-cell {
+  -fx-padding: 4 0 2 0px;
+  -fx-border-width: 1px;
+  -fx-border-color: blue;
+  -fx-background-color: transparent;
+}
+
+.hex-box {
+  -fx-background-color: transparent;
+}
