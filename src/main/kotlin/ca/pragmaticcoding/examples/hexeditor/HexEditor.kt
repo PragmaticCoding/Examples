@@ -1,150 +1,97 @@
 package ca.pragmaticcoding.examples.hexeditor
 
-import javafx.beans.property.*
-import javafx.beans.value.ObservableBooleanValue
-import javafx.beans.value.ObservableValue
-import javafx.css.PseudoClass
+import javafx.application.Application
+import javafx.beans.property.BooleanProperty
+import javafx.collections.FXCollections
+import javafx.collections.ObservableList
+import javafx.geometry.Insets
 import javafx.geometry.Pos
-import javafx.scene.control.*
+import javafx.scene.Scene
+import javafx.scene.control.CheckBox
+import javafx.scene.control.Label
+import javafx.scene.control.ListView
+import javafx.scene.layout.BorderPane
 import javafx.scene.layout.HBox
 import javafx.scene.layout.Region
-import javafx.scene.layout.VBox
+import javafx.scene.layout.StackPane
+import javafx.stage.Stage
+import javafx.util.Builder
+import kotlin.random.Random
 
-class HexEditorCell(private val controlModel: HexCellControlModel) : ListCell<HexRow>() {
-    private val rowString: StringProperty = SimpleStringProperty("")
-    private val offsetString: StringProperty = SimpleStringProperty("")
-    private val isEditing: BooleanProperty = SimpleBooleanProperty(false)
-    private val editingPos: IntegerProperty = SimpleIntegerProperty(0)
-    private val editorFocused: BooleanProperty = SimpleBooleanProperty(false)
-    private val minimumWidth: ObservableValue<Double> = controlModel.showBinary.map { if (it) 60.0 else 24.0 }
+class HexEditorModel() {
+    val rows: ObservableList<HexRow> = FXCollections.observableArrayList()
+}
 
-    companion object {
-        val editingPseudoClass: PseudoClass = PseudoClass.getPseudoClass("editing")
-    }
-
-    private val layout: Region = HBox(20.0).apply {
-        children += Label().apply {
-            textProperty().bind(offsetString)
-            minWidth = 50.0
-            alignment = Pos.CENTER_RIGHT
-            styleClass += "hex-title"
+class HexEditorInteractor(private val hexEditorModel: HexEditorModel) {
+    init {
+        for (x in 0..500) {
+            val fred = Random.Default.nextBytes(16)
+            hexEditorModel.rows += HexRow(x * 16, fred)
         }
-        children += VBox(12.0).apply {
-            children += HBox(14.0).apply {
-                children += VBox(
-                    Label("Hex"),
-                    hideableLabel(controlModel.showOctal, "Octal"),
-                    hideableLabel(controlModel.showDecimal, "Decimal"),
-                    hideableLabel(controlModel.showBinary, "Binary"),
-                    hideableLabel(controlModel.showCharacter, "Char")
-                ).apply {
-                    alignment = Pos.TOP_RIGHT
-                    minWidth = 60.0
-                }
-                for (x in 0..15) {
-                    children += VBox().apply {
-                        children += dataLabel(SimpleBooleanProperty(true)) {
-                            extractHex(it, x)?.uppercase() ?: ""
-                        }.apply {
-                            styleClass += "hex-label"
-                            editingPos.subscribe(Runnable {
-                                this.pseudoClassStateChanged(
-                                    editingPseudoClass,
-                                    ((editingPos.value == x) && editorFocused.value)
-                                )
-                            })
-                            isEditing.subscribe(Runnable {
-                                this.pseudoClassStateChanged(
-                                    editingPseudoClass,
-                                    ((editingPos.value == x) && editorFocused.value)
-                                )
-                            })
-                        }
-                        children += dataLabel(controlModel.showOctal) { extractRadix(it, x, 8).padStart(3, '0') }
-                        children += dataLabel(controlModel.showDecimal) { extractRadix(it, x, 10) }
-                        children += dataLabel(controlModel.showBinary) { extractRadix(it, x, 2).padStart(8, '0') }
-                        children += dataLabel(controlModel.showCharacter) { extractChar(it, x) }
-                        alignment = Pos.TOP_CENTER
-                    }
-                }
-                children += ToggleButton("Edit").apply { selectedProperty().bindBidirectional(isEditing) }
+    }
+}
+
+class HexEditorViewBuilder(private val hexEditorModel: HexEditorModel) : Builder<Region> {
+    private val cellControlModel = HexCellControlModel()
+    override fun build(): Region = BorderPane().apply {
+        top = HBox(14.0).apply {
+            children += Label("Offset").apply {
+                minWidth = 62.0
+                alignment = Pos.CENTER_RIGHT
+                styleClass += "hex-title"
             }
-            children += HBox(12.0).apply {
-                children += TextField().apply {
-                    textProperty().bindBidirectional(rowString)
-                    editingPos.bind(caretPositionProperty().map { (it as Int) / 2 })
-                    editorFocused.bind(focusedProperty())
-                    minWidth = 250.0
+            children += Label().apply { minWidth = 62.0 }
+            for (x in 0..15) {
+                children += Label(x.toString()).apply {
+                    minWidth = 24.0
+                    alignment = Pos.CENTER
+                    styleClass += "hex-title"
                 }
-                children += Button("Commit").apply {
-                    defaultButtonProperty().bind(editorFocused)
-                    setOnAction { item.data = rowString.value.decodeHex() }
-                }
-                visibleProperty().bind(isEditing)
-                managedProperty().bind(isEditing)
-                alignment = Pos.CENTER
-                styleClass += "hex-box"
+
             }
-            styleClass += "hex-box"
+
         }
-        styleClass += "hex-cell"
-    }
+        center = StackPane().apply {
+            children += ListView<HexRow>().apply {
+                items = hexEditorModel.rows
+                setCellFactory { HexEditorCell(cellControlModel) }
+            }
+        }
 
-    private fun String.decodeHex(): ByteArray {
-        check(length % 2 == 0) { "Must have an even length" }
-
-        return chunked(2)
-            .map { it.toInt(16).toByte() }
-            .toByteArray()
-    }
-
-    private fun dataLabel(visibleBinding: ObservableBooleanValue, mapFunction: (String) -> String) =
-        hideableLabel(visibleBinding).apply {
-            textProperty().bind(rowString.map { mapFunction(it) })
-            minWidthProperty().bind(minimumWidth)
+        bottom = HBox(14.0).apply {
+            children += boundCheckBox("Octal", cellControlModel.showOctal)
+            children += boundCheckBox("Binary", cellControlModel.showBinary)
+            children += boundCheckBox("Decimal", cellControlModel.showDecimal)
+            children += boundCheckBox("Character", cellControlModel.showCharacter)
+            padding = Insets(14.0)
             alignment = Pos.CENTER
-
         }
-
-    private fun hideableLabel(visibleBinding: ObservableBooleanValue, text: String = "") = Label(text).apply {
-        visibleProperty().bind(visibleBinding)
-        managedProperty().bind(visibleBinding)
     }
 
-    private fun extractHex(bigString: String, index: Int): String? =
-        if (bigString.length > ((index * 2) + 1)) bigString.substring(index * 2, (index * 2) + 2) else null
-
-    @OptIn(ExperimentalStdlibApi::class)
-    private fun toRadix(hexString: String, radix: Int) = hexString.hexToInt().toString(radix)
-
-    private fun extractRadix(bigString: String, index: Int, radix: Int) =
-        extractHex(bigString, index)?.let { toRadix(it, radix) } ?: ""
-
-    @OptIn(ExperimentalStdlibApi::class)
-    private fun extractChar(bigString: String, index: Int) =
-        extractHex(bigString, index)?.hexToInt()?.toChar()?.toString() ?: ""
-
-
-    @OptIn(ExperimentalStdlibApi::class)
-    @Override
-    public override fun updateItem(hexRow: HexRow?, isEmpty: Boolean) {
-        super.updateItem(hexRow, isEmpty)
-        if (!isEmpty && (hexRow != null)) {
-            offsetString.value = hexRow.offset.toString()
-            rowString.value = hexRow.data.toHexString()
-            isEditing.value = false
-            text = null
-            graphic = layout
-        } else {
-            graphic = null
-            text = null
-        }
+    private fun boundCheckBox(text: String, boundProperty: BooleanProperty) = CheckBox(text).apply {
+        selectedProperty().bindBidirectional(boundProperty)
     }
 }
 
-class HexCellControlModel() {
-    val showOctal: BooleanProperty = SimpleBooleanProperty(true)
-    val showBinary: BooleanProperty = SimpleBooleanProperty(false)
-    val showDecimal: BooleanProperty = SimpleBooleanProperty(true)
-    val showCharacter: BooleanProperty = SimpleBooleanProperty(true)
+
+class HexRow(val offset: Int, var data: ByteArray) {}
+
+class HexEditorController() {
+    private val model = HexEditorModel()
+    private val interactor = HexEditorInteractor(model)
+    private val viewBuilder = HexEditorViewBuilder(model)
+
+    fun getView() = viewBuilder.build()
 }
+
+class HexEditorApplication : Application() {
+    override fun start(stage: Stage) {
+        stage.scene = Scene(HexEditorController().getView(), 840.0, 800.0).apply {
+            HexEditorApplication::class.java.getResource("hexeditor.css")?.toString()?.let { stylesheets += it }
+        }
+        stage.title = "Hexadecimal Editor"
+        stage.show()
+    }
+}
+
+fun main() = Application.launch(HexEditorApplication::class.java)
